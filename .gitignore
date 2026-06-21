@@ -1,4 +1,6 @@
 
 
 # Ignore the data directory
-./data
+./data/raw
+./data/*
+data/*
