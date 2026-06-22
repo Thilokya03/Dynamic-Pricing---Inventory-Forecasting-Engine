@@ -1,15 +1,11 @@
-# Virtual environment
 .venv/
-
-# Environment files
 .env
 
-# Raw and processed datasets
 data/raw/
 data/processed/
 Data/raw/
 Data/processed/
+Dataset/
 
-# Python cache
 __pycache__/
 *.pyc
