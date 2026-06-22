@@ -294,6 +294,7 @@ Next steps:
 
 ---
 
+
 ## License
 
-This project is for academic and learning purposes. A license can be added later depending on the final project requirements.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
