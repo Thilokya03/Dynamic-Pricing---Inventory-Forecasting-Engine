@@ -1,6 +1,15 @@
-# Ignore the .env file
+# Virtual environment
 .venv/
 
-# Ignore the data directory
-data/raw/
+# Environment files
+.env
 
+# Raw and processed datasets
+data/raw/
+data/processed/
+Data/raw/
+Data/processed/
+
+# Python cache
+__pycache__/
+*.pyc
