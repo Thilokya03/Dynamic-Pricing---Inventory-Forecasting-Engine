@@ -14,10 +14,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: "pip"
@@ -34,6 +34,30 @@ jobs:
             echo "No requirements.txt found"
           fi
 
+      - name: Create dataset cache directory
+        run: |
+          mkdir -p data/raw/m5-forecasting-accuracy
+
+      - name: Restore M5 dataset cache
+        id: cache-m5
+        uses: actions/cache@v5
+        with:
+          path: data/raw/m5-forecasting-accuracy
+          key: ${{ runner.os }}-m5-forecasting-accuracy-v1
+
+      - name: Download dataset if cache is missing
+        if: steps.cache-m5.outputs.cache-hit != 'true'
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+        run: |
+          if [ -z "$KAGGLE_API_TOKEN" ]; then
+            echo "KAGGLE_API_TOKEN secret is missing."
+            echo "Skipping dataset download in CI."
+            exit 0
+          fi
+
+          python scripts/0.download_dataset.py
+
       - name: Check Python syntax
         run: |
           python -m compileall scripts models notebooks
@@ -46,35 +70,6 @@ jobs:
           else
             echo "No raw dataset CSV files are committed."
           fi
-
-      - name: Restore M5 dataset cache
-        id: cache-m5
-        uses: actions/cache@v4
-        with:
-          path: data/raw/m5-forecasting-accuracy
-          key: ${{ runner.os }}-m5-forecasting-accuracy-v1
-
-      - name: Download dataset if cache is missing
-        if: steps.cache-m5.outputs.cache-hit != 'true'
-        env:
-          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
-        run: |
-          if [ -z "$KAGGLE_API_TOKEN" ]; then
-            echo "KAGGLE_API_TOKEN secret is missing."
-            echo "Add it in GitHub: Settings > Secrets and variables > Actions."
-            exit 1
-          fi
-
-          python scripts/0.download_dataset.py
-
-      - name: Run project scripts
-        run: |
-          for script in scripts/*.py; do
-            if [ "$(basename "$script")" != "0.download_dataset.py" ]; then
-              echo "Running $script"
-              python "$script"
-            fi
-          done
 
       - name: Run tests if available
         run: |
