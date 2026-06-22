@@ -294,12 +294,6 @@ Next steps:
 
 ---
 
-## Author
-
-**Thilokya DC**
-
----
-
 ## License
 
 This project is for academic and learning purposes. A license can be added later depending on the final project requirements.
