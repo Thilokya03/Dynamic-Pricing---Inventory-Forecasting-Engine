@@ -1,6 +1,6 @@
-
+# Ignore the .env file
+.venv/
 
 # Ignore the data directory
-./data/raw
-./data/*
-data/*
+data/raw/
+
