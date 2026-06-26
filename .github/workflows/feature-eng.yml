@@ -1,0 +1,79 @@
+# Workflow: Feature Engineering checks (Pipeline 1)
+#
+# What this does, in plain English:
+#   Every time someone changes the feature engineering code, GitHub runs this
+#   automatically on a clean Linux machine. It installs the project, then runs
+#   the unit tests that prove the lag / rolling / price-elasticity logic is
+#   correct. If anything is broken, the check goes RED and you see it on the PR.
+#
+# Why it is safe:
+#   - It does NOT need the Kaggle dataset (the tests use tiny built-in fake data).
+#   - It does NOT need any secrets/passwords.
+#   - It only reads code and runs tests. It changes nothing.
+
+name: Feature Engineering CI
+
+# "on" = WHEN this workflow runs.
+on:
+  # Run when code is pushed to these branches...
+  push:
+    branches:
+      - main
+      - "feature-eng-*"   # e.g. your feature-eng-nadil branch
+    # ...but ONLY if one of these feature-engineering files changed.
+    # (No point re-running it when only the README or other code changes.)
+    paths:
+      - "src/features/**"
+      - "scripts/1.build_features.py"
+      - "tests/**"
+      - "requirements.txt"
+      - ".github/workflows/feature-eng.yml"
+
+  # Also run on pull requests that target main, with the same file filter.
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/features/**"
+      - "scripts/1.build_features.py"
+      - "tests/**"
+      - "requirements.txt"
+      - ".github/workflows/feature-eng.yml"
+
+  # Lets you trigger it manually from the GitHub "Actions" tab (the Run button).
+  workflow_dispatch:
+
+# "jobs" = the actual work. This workflow has one job.
+jobs:
+  feature-tests:
+    runs-on: ubuntu-latest   # a fresh Linux machine GitHub gives you for free
+
+    steps:
+      # 1. Download your repository code onto the machine.
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      # 2. Install Python 3.11 (same version you use locally).
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"   # caches downloaded packages to speed up future runs
+
+      # 3. Install the project's dependencies (pandas, numpy, pyarrow, etc.).
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 4. Sanity check: make sure the feature package imports without errors.
+      #    Catches typos / broken imports before even running the tests.
+      - name: Import feature package
+        run: |
+          python -c "from src.features import build_features, config, data_loader; print('imports OK')"
+
+      # 5. The main event: run the feature engineering unit tests.
+      #    -v = verbose (shows each test name and pass/fail).
+      - name: Run feature engineering tests
+        run: |
+          pytest tests/ -v

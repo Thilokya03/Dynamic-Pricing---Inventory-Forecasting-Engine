@@ -56,15 +56,25 @@ Dynamic-Pricing---Inventory-Forecasting-Engine/
 │       └── ci.yml
 │
 ├── data/
-│   ├── raw/
-│   └── processed/
+│   ├── raw/               ← downloaded M5 CSV files (git-ignored)
+│   └── processed/         ← engineered feature table (git-ignored)
 │
 ├── models/
 │
 ├── notebooks/
 │
 ├── scripts/
-│   └── 0.download_dataset.py
+│   ├── 0.download_dataset.py   ← download raw M5 data from Kaggle
+│   └── 1.build_features.py     ← build feature table → data/processed/features.parquet
+│
+├── src/
+│   └── features/
+│       ├── config.py            ← paths, column names, feature parameters
+│       ├── data_loader.py       ← melt wide→long, merge calendar + prices
+│       └── build_features.py    ← lag / rolling / price-elasticity / calendar features
+│
+├── tests/
+│   └── test_build_features.py  ← unit tests for feature builders
 │
 ├── .gitignore
 ├── requirements.txt
@@ -165,21 +175,78 @@ Run:
 python scripts/0.download_dataset.py
 ```
 
-After downloading, the raw data should be stored locally inside:
+After downloading, the raw data will be stored locally inside `data/raw/`:
 
 ```text
-data/raw/m5-forecasting-accuracy/
+data/raw/
+├── calendar.csv
+├── sales_train_validation.csv
+├── sales_train_evaluation.csv
+├── sell_prices.csv
+└── sample_submission.csv
 ```
 
-Expected files include:
+---
+
+## Feature Engineering (Pipeline 1)
+
+This step reads the raw M5 data, engineers all features, and writes the processed
+dataset to `data/processed/features.parquet`.
+
+### What it produces
+
+A single parquet file with one row per (product, store, day) and 46 columns:
+
+| Feature group | Columns |
+|---|---|
+| Identifiers | `id`, `item_id`, `dept_id`, `cat_id`, `store_id`, `state_id` |
+| Lag features | `sales_lag_1`, `sales_lag_7`, `sales_lag_14`, `sales_lag_28` |
+| Rolling stats | `sales_roll_mean/std/max_{7,14,28}` |
+| Price features | `sell_price`, `price_change`, `price_change_pct`, `price_roll_mean`, `price_discount_pct`, `price_elasticity` |
+| Calendar | `date`, `day_of_week`, `is_weekend`, `week_of_year`, `month`, `year` |
+| Event / SNAP | `is_event`, `event_name_1`, `event_type_1`, `snap_active` |
+
+### Quick test (first 5 items, ~7 seconds)
+
+Use this first to confirm everything works before running on the full dataset:
+
+```bash
+python scripts/1.build_features.py --sample-items 5
+```
+
+### Full dataset
+
+```bash
+python scripts/1.build_features.py
+```
+
+This processes all ~30,000 product-store series across ~1,900 days (~60 million rows).
+Expect a few minutes and ~4–6 GB RAM usage.
+
+The processed dataset will be saved to:
 
 ```text
-calendar.csv
-sales_train_validation.csv
-sales_train_evaluation.csv
-sell_prices.csv
-sample_submission.csv
+data/processed/features.parquet
 ```
+
+### Options
+
+```bash
+# custom output path
+python scripts/1.build_features.py --output data/processed/my_features.parquet
+
+# keep warm-up rows that have NaN lag/rolling values (dropped by default)
+python scripts/1.build_features.py --keep-warmup
+```
+
+### Run tests
+
+```bash
+python -m pytest tests/
+```
+
+All 5 tests should pass. They verify lag correctness, no-leakage guarantees,
+price feature logic, and per-series isolation.
 
 ---
 
@@ -216,81 +283,89 @@ The workflow can also use cache to speed up dataset-related tasks.
 
 ## Recommended Workflow
 
-### Step 1: Download raw data
+### Step 1: Clone and set up
+
+```bash
+git clone https://github.com/Thilokya03/Dynamic-Pricing---Inventory-Forecasting-Engine.git
+cd Dynamic-Pricing---Inventory-Forecasting-Engine
+python -m venv .venv
+# Windows:   .venv\Scripts\Activate
+# macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Step 2: Authenticate with Kaggle
+
+```python
+import kagglehub
+kagglehub.login()
+```
+
+### Step 3: Download raw data
 
 ```bash
 python scripts/0.download_dataset.py
 ```
 
-### Step 2: Explore the dataset
+### Step 4: Build the feature table  ← *you are here*
 
-Use notebooks inside the `notebooks/` folder for data understanding and experiments.
+```bash
+# quick test
+python scripts/1.build_features.py --sample-items 5
 
-### Step 3: Preprocess data
-
-Create preprocessing scripts and save cleaned outputs inside:
-
-```text
-data/processed/
+# full dataset
+python scripts/1.build_features.py
 ```
 
-### Step 4: Build forecasting models
+Output: `data/processed/features.parquet`
 
-Train forecasting models and save trained model files inside:
+### Step 5: Train the forecasting model *(coming next)*
 
-```text
-models/
-```
+Train a LightGBM demand forecasting model using the feature table and track
+experiments with MLflow.
 
-### Step 5: Add pricing logic
+### Step 6: Pricing optimization *(planned)*
 
-Use demand forecasts, stock levels, and price history to support dynamic pricing decisions.
+Use demand forecasts, stock levels, and price history to recommend the best
+price per product per day.
 
----
+### Step 7: API and deployment *(planned)*
 
-## Planned Features
-
-* Data preprocessing pipeline
-* Exploratory data analysis notebooks
-* Demand forecasting models
-* Inventory forecasting
-* Price elasticity analysis
-* Dynamic pricing recommendation logic
-* Model evaluation reports
-* Automated CI checks
+Expose predictions via a FastAPI REST API, containerize with Docker, and deploy
+via GitHub Actions CI/CD.
 
 ---
 
 ## Technologies Used
 
-* Python
-* KaggleHub
-* Jupyter Notebook
-* GitHub Actions
-* Git
-* Machine Learning / Forecasting libraries
+| Tool | Purpose |
+|---|---|
+| Python 3.11 | Core language |
+| pandas / numpy | Data processing and feature engineering |
+| pyarrow | Parquet read/write |
+| LightGBM *(planned)* | Demand forecasting model |
+| MLflow *(planned)* | Experiment tracking |
+| FastAPI *(planned)* | REST API |
+| PostgreSQL *(planned)* | Inventory and sales database |
+| Docker *(planned)* | Containerization |
+| GitHub Actions | CI/CD |
+| KaggleHub | Dataset download |
 
 ---
 
 ## Current Status
 
-This project is currently in the initial setup stage.
-
-Completed:
-
-* Basic repository structure
-* Dataset download script
-* `.gitignore` setup for large dataset files
-* Python dependency file
-* GitHub Actions CI setup
-
-Next steps:
-
-* Add data preprocessing scripts
-* Add exploratory data analysis notebooks
-* Build baseline forecasting model
-* Add model evaluation metrics
-* Extend the project toward dynamic pricing optimization
+| Stage | Status |
+|---|---|
+| Repository setup | Done |
+| Dataset download script | Done |
+| Feature engineering pipeline | **Done** |
+| LightGBM model training | Planned |
+| MLflow experiment tracking | Planned |
+| Pricing optimization engine | Planned |
+| FastAPI backend | Planned |
+| Docker containerization | Planned |
+| Automated retraining (MLOps) | Planned |
 
 ---
 
