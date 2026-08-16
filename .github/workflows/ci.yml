@@ -75,7 +75,7 @@ jobs:
         run: |
           if [ -d tests ]; then
             pip install pytest
-            pytest
+            python -m pytest tests -v
           else
             echo "No tests folder found. Skipping tests."
           fi
