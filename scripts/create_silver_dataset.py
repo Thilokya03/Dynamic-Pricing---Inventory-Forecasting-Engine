@@ -10,9 +10,9 @@ RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw"
 SILVER_DATA_DIR = PROJECT_ROOT / "data" / "silver"
 
 def transform_sales_data(sales_df: pl.LazyFrame) -> pl.LazyFrame:
-    # Product and location columns to keep
+
     id_columns = [
-        'id',
+        "id",
         "item_id",
         "dept_id",
         "cat_id",
@@ -20,20 +20,20 @@ def transform_sales_data(sales_df: pl.LazyFrame) -> pl.LazyFrame:
         "state_id",
     ]
 
-    # Select only columns such as d_1, d_2, d_3, ...
+    columns = sales_df.collect_schema().names()
+
     day_columns = [
         column
-        for column in sales_df.columns
+        for column in columns
         if column.startswith("d_")
     ]
 
-    sales_df = sales_df.melt(
-        id_vars=id_columns,
-        value_vars=day_columns,
+    return sales_df.unpivot(
+        on=day_columns,
+        index=id_columns,
         variable_name="d",
-        value_name="sales"
+        value_name="sales",
     )
-    return sales_df
 
 
 def add_calendar_info(sales_df: pl.LazyFrame, calendar_df: pl.LazyFrame) -> pl.LazyFrame:
@@ -55,15 +55,18 @@ def add_prices_info(sales_df: pl.LazyFrame, prices_df: pl.LazyFrame) -> pl.LazyF
     return result_df
 
 
-def save_to_parquet(df: pl.LazyFrame, filename: str):
-    SILVER_DATA_DIR.mkdir(parents=True, exist_ok=True)
+def save_to_parquet( df: pl.LazyFrame, output_path: str | Path) -> None:
 
-    output_path = SILVER_DATA_DIR / f"{filename}.parquet"
+    output_path = Path(output_path)
+
+    output_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     df.sink_parquet(
         output_path,
         compression="snappy",
-        engine="streaming",
     )
 
 def main():
@@ -102,8 +105,6 @@ def main():
     
 
     
-
-
 if __name__ == "__main__":
     main()
 

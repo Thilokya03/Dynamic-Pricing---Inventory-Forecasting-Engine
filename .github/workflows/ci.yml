@@ -56,7 +56,7 @@ jobs:
             exit 0
           fi
 
-          python scripts/0.download_dataset.py
+          python scripts/download_dataset.py
 
       - name: Check Python syntax
         run: |
