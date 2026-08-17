@@ -79,3 +79,8 @@ jobs:
           else
             echo "No tests folder found. Skipping tests."
           fi
+
+      - name: Run the scripts
+        run: |
+          python scripts/create_silver_dataset.py
+          python scripts/baseline_model.py
